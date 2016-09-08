@@ -14,22 +14,24 @@ var commands = {
 
 
 // contacts
-bot.onText(new RegExp('^('+commands.contacts+'|\/contacts)$'), function (msg, match) {
-	var fromId = msg.from.id;
-	
+bot.onText(new RegExp('^('+commands.contacts+'|\/contacts)'), function (msg, match) {
 	fs.readFile('./contacts.md', function (err, data) {
 		var opts = {parse_mode: 'markdown'};
-		
-		sendMessageWithDefaultMenu(data, fromId, opts);
+	
+		if ( msg.chat.type != 'group' ) { 
+			bot.sendMessage(msg.chat.id, data, opts);
+		} else if ( msg.chat.type == 'private' ){
+			sendMessageWithDefaultMenu(data, msg.from.id, opts);			
+		}
 	});
 
 });
 
-function sendMessageWithDefaultMenu(msg, userID, opts) { 	
+function sendMessageWithDefaultMenu(msg, toID, opts) { 	
 	var defaultKeyboard = [ 
-		[	commands["contacts"], commands["links"]		], 
-		[	commands["rides"],	commands["gazvoda"]		], 
-		[	commands["settings"] 	]
+		[  commands["contacts"],  commands["links"]	   ], 
+		[  commands["rides"],     commands["gazvoda"]  ], 
+		[  commands["settings"]  ]
 	];
 	
 	var newOpts = opts;
@@ -44,5 +46,5 @@ function sendMessageWithDefaultMenu(msg, userID, opts) {
 				"one_time_keyboard": false,
 			});
 		
-	bot.sendMessage(userID, msg, newOpts);
+	bot.sendMessage(toID, msg, newOpts);
 }
