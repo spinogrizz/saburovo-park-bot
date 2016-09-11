@@ -1,16 +1,21 @@
 const fs = require("fs");
 require("./token.js")(); //import API token
 
-var TelegramBot = require('node-telegram-bot-api');
-var bot = new TelegramBot(token, {polling: true});
+var node_redis = require('redis');
+global.redis = node_redis.createClient();
 
-var commands = {
+var TelegramBot = require('node-telegram-bot-api');
+global.bot = new TelegramBot(token, {polling: true});
+
+global.commands = {
 	contacts: "📞 Контакты",
 	links: 	"📋 Полезности"	,
 	rides: "🚗 Попутчики β",
 	gazvoda: "🔥🚿 Счетчики β",
-	settings: "⚙ Настройки β"
+	settings: "🔧 Настройки"
 }
+
+require("./settings.js");
 
 // start {
 bot.onText(/\/start/, function (msg, match) {	
@@ -28,7 +33,6 @@ bot.onText(new RegExp('^('+commands.contacts+'|\/contacts)'), function (msg, mat
 			sendMessageWithDefaultMenu(data, msg.from.id, opts);			
 		}
 	});
-
 });
 
 function sendMessageWithDefaultMenu(msg, toID, opts) { 	
@@ -46,10 +50,19 @@ function sendMessageWithDefaultMenu(msg, toID, opts) {
 	
 	newOpts["reply_markup"] = 
 			JSON.stringify({
-				"keyboard": defaultKeyboard, 
-				"one_time_keyboard": false,
-				selective: true
+				keyboard: defaultKeyboard, 
+				one_time_keyboard: false,
+				selective: true,
+				resize_keyboard: true
 			});
 		
 	bot.sendMessage(toID, msg, newOpts);
 }
+
+bot.onText(new RegExp('^(отмена|\/cancel|назад в меню)', 'i'), function (msg, match) {
+	if ( msg.chat.type == 'private' ){
+		sendMessageWithDefaultMenu("Хорошо, чем могу быть еще полезен?", msg.from.id);			
+	}
+	
+	//console.log("main cancel");
+});
