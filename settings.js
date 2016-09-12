@@ -2,9 +2,11 @@
 
 var settingsCommands = {
 	changeName: "📝 Имя",
-	changePhone: "☎️ Телефон",	
+	changePhone: "☎️ Тел №",	
 	changeEmail: "✉️ E-mail",		
-	changeAddress: "🏡 Адрес"
+	changeAddress: "🏡 Адрес",
+	changeKidsInfo: "👶 Дети",
+	changeAboutInfo: "📖 О себе"	
 };
 
 var streets = {
@@ -19,14 +21,16 @@ var settingsUserState = {
 	changeNameState : 1,	
 	changePhoneState : 2,	
 	changeEmailState : 3,	
-	changeAddressState : 4
+	changeAddressState : 4,
+	changeKidsInfoState : 5,
+	changeAboutInfoState : 6
 }
 
 var currentState = {}; //settingsUserState.defaultState;
 
 var settingsKeyboard = [ 
-	[  settingsCommands.changeName, settingsCommands.changeAddress ],
-	[  settingsCommands.changePhone, settingsCommands.changeEmail  ],
+	[  settingsCommands.changeName, settingsCommands.changeEmail, settingsCommands.changePhone  ],
+	[  settingsCommands.changeAddress, settingsCommands.changeKidsInfo, settingsCommands.changeAboutInfo  ],
 	[ "Назад в меню" ]
 ];
 
@@ -36,7 +40,7 @@ bot.onText(new RegExp('^('+commands.settings+'|\/settings)'), function (msg, mat
 		return; //allow to change settings only in private conversation
 	}
 	
-	var message = "Что будем настраивать?";
+	var message = "Что будем настраивать/указывать?";
 	
 	var redisUserKey = "users:"+msg.from.id;
 	
@@ -44,7 +48,11 @@ bot.onText(new RegExp('^('+commands.settings+'|\/settings)'), function (msg, mat
 
 		// set default name based on telegram info
 		if ( obj == null || obj["name"] == null ) {
-			var name = msg.from.first_name + " " + msg.from.last_name;
+			var first = msg.from.first_name;
+			var last = msg.from.last_name;
+			
+			var name = first != undefined ? first : "";
+			name += last != undefined ? (" "+last) : "";
 			
 			if ( name.length <= 3 ) {
 				name = msg.from.username;
@@ -55,11 +63,14 @@ bot.onText(new RegExp('^('+commands.settings+'|\/settings)'), function (msg, mat
 		}
 
 		message += "\n  *Имя*: " + obj["name"];
-		message += "\n  *Контактный телефон*: " + ((obj["tel"] == null) ? "не указан" : obj["tel"]);
-		message += "\n  *E-mail*: " + ((obj["email"] == null) ? "не указан" : obj["email"]);		
+		message += "\n  *Контактный телефон*: " + ((obj["tel"] == null) ? "_не указан_" : obj["tel"]);
+		message += "\n  *E-mail*: " + ((obj["email"] == null) ? "_не указан_" : obj["email"]);		
 		message += "\n  *Адрес*: "
-								 + ((obj["street"] == null) ? 	"не указан"	 : obj["street"]) 
+								 + ((obj["street"] == null) ? 	"_не указан_"	 : obj["street"]) 
 								 + ((obj["house"] == null)  ? 	""			 : (", "+obj["house"]));
+
+		message += "\n  *Дети*: " + ((obj["kids"] == null) ? "_нет сведений_" : obj["kids"]);		
+		message += "\n  *О себе*: " + ((obj["bio"] == null) ? "_пусто_" : obj["bio"]);				
 
 		var opts = {
 			reply_markup: JSON.stringify({ keyboard: settingsKeyboard, resize_keyboard: true}),
@@ -74,7 +85,9 @@ bot.onText(new RegExp('^('+commands.settings+'|\/settings)'), function (msg, mat
 // change name/phone/email command 
 bot.onText(new RegExp( '^('	+ settingsCommands.changeName
 					  + '|' + settingsCommands.changePhone
-					  + '|' + settingsCommands.changeEmail	+ ')$'), function (msg, match)  {	
+					  + '|' + settingsCommands.changeEmail	
+					  + '|' + settingsCommands.changeKidsInfo	
+					  + '|' + settingsCommands.changeAboutInfo	+ ')$'), function (msg, match)  {	
 								
 	if ( msg.chat.type != 'private' ) { 
 		return; //allow to change settings only in private conversation
@@ -95,6 +108,14 @@ bot.onText(new RegExp( '^('	+ settingsCommands.changeName
 		case settingsCommands.changeEmail:
 			state = settingsUserState.changeEmailState;
 			prompt = "Напишите свой адрес e-mail, пожалуйста (обещаем не спамить):"			
+			break;
+		case settingsCommands.changeKidsInfo:
+			state = settingsUserState.changeKidsInfoState;
+			prompt = "Укажите имена и возраст своих детей, включая №№ школ/садов, куда они ходят:"
+			break;
+		case settingsCommands.changeAboutInfo:
+			state = settingsUserState.changeAboutInfoState;
+			prompt = "Напишите вкратце свои увлечения, интересы и род занятий (для поиска единомышленников):"
 			break;
 		default:
 			break;
@@ -118,6 +139,32 @@ bot.onText(new RegExp( '^('	+ settingsCommands.changeName
 	}
 });
 
+// capture all text input for generic fields
+bot.onText(/.{3,}/, function (msg, match) {
+	if ( match[0] == 'отмена' ) { 
+		return; //it's a special case for other handler
+	}	
+	
+	if ( msg.chat.type != 'private' ) { 
+		return; //allow to change settings only in private conversation
+	}
+
+	if ( getCurrentState(msg.from.id) == settingsUserState.changeKidsInfoState ) {	
+		redis.hset("users:"+msg.from.id, "kids", match[0]);
+	} else if ( getCurrentState(msg.from.id) == settingsUserState.changeAboutInfoState ) {
+		redis.hset("users:"+msg.from.id, "bio", match[0]);
+	} else {
+		return;
+	}
+	
+	var opts = {
+		reply_markup: JSON.stringify({ keyboard: settingsKeyboard, resize_keyboard: true}),
+		parse_mode: "markdown"
+	};
+	
+	bot.sendMessage(msg.from.id, "Супер! Что-нибудь еще будем настраивать?", opts);
+	setCurrentState(msg.from.id, settingsUserState.defaultState);
+});
 
 // capture normal text input when prompted for address
 bot.onText(new RegExp("^[а-яA-Z \.\-]{3,50}$", 'i'), function (msg, match) {
