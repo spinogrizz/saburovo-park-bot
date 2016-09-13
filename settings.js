@@ -141,7 +141,7 @@ bot.onText(new RegExp( '^('	+ settingsCommands.changeName
 
 // capture all text input for generic fields
 bot.onText(/.{3,}/, function (msg, match) {
-	if ( match[0] == 'отмена' ) { 
+	if ( match[0].toLowerCase() == 'отмена' || match[0].toLowerCase() == 'назад в меню' ) { 
 		return; //it's a special case for other handler
 	}	
 	
@@ -167,9 +167,9 @@ bot.onText(/.{3,}/, function (msg, match) {
 });
 
 // capture normal text input when prompted for address
-bot.onText(new RegExp("^[а-яA-Z \.\-]{3,50}$", 'i'), function (msg, match) {
+bot.onText(new RegExp("^[а-яA-Z \\.\\-]{3,50}$", 'i'), function (msg, match) {
 	if ( getCurrentState(msg.from.id) == settingsUserState.changeNameState ) {
-		if ( match[0] == 'отмена' ) { 
+		if ( match[0].toLowerCase() == 'отмена' || match[0].toLowerCase() == 'назад в меню' ) { 	
 			return; //it's a special case for other handler
 		}
 		
