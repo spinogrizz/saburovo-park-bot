@@ -39,45 +39,57 @@ bot.onText(new RegExp('^('+commands.settings+'|\/settings)'), function (msg, mat
 	if ( msg.chat.type != 'private' ) { 
 		return; //allow to change settings only in private conversation
 	}
-	
-	var message = "Что будем настраивать/указывать?";
-	
-	var redisUserKey = "users:"+msg.from.id;
-	
-	redis.hgetall(redisUserKey, function (err, obj) {
 
-		// set default name based on telegram info
-		if ( obj == null || obj["name"] == null ) {
-			var first = msg.from.first_name;
-			var last = msg.from.last_name;
-			
-			var name = first != undefined ? first : "";
-			name += last != undefined ? (" "+last) : "";
-			
-			if ( name.length <= 3 ) {
-				name = msg.from.username;
-			}
-			
-			obj = { "name": name }	
-			redis.hset(redisUserKey, "name", name);
+	global.checkAuthentication(msg.from.id, function(result) {
+		if ( result == false ) {
+			return;
 		}
 
-		message += "\n  *Имя*: " + obj["name"];
-		message += "\n  *Контактный телефон*: " + ((obj["tel"] == null) ? "_не указан_" : obj["tel"]);
-		message += "\n  *E-mail*: " + ((obj["email"] == null) ? "_не указан_" : obj["email"]);		
-		message += "\n  *Адрес*: "
-								 + ((obj["street"] == null) ? 	"_не указан_"	 : obj["street"]) 
-								 + ((obj["house"] == null)  ? 	""			 : (", "+obj["house"]));
+		var message = "Что будем настраивать/указывать?";
+		
+		var redisUserKey = "users:"+msg.from.id;
+		
+		redis.hgetall(redisUserKey, function (err, obj) {
 
-		message += "\n  *Дети*: " + ((obj["kids"] == null) ? "_нет сведений_" : obj["kids"]);		
-		message += "\n  *О себе*: " + ((obj["bio"] == null) ? "_пусто_" : obj["bio"]);				
+			// set default name based on telegram info
+			if ( obj == null || obj["name"] == null ) {
+				var first = msg.from.first_name;
+				var last = msg.from.last_name;
+				
+				var name = first != undefined ? first : "";
+				name += last != undefined ? (" "+last) : "";
+				
+				if ( name.length <= 3 ) {
+					name = msg.from.username;
+				}
+				
+				obj = { "name": name }	
+				redis.hset(redisUserKey, "name", name);
+			}
+			
+			if ( obj["username"] == null && msg.from.username != null ) {
+				obj["username"] = msg.from.username;
+				
+				redis.hset(redisUserKey, "username", msg.from.username);
+			}
+			
+			message += "\n  *Имя*: " + obj["name"];
+			message += "\n  *Телефон*: " + ((obj["tel"] == null) ? "_не указан_" : obj["tel"]);
+			message += "\n  *E-mail*: " + ((obj["email"] == null) ? "_не указан_" : obj["email"]);		
+			message += "\n  *Адрес*: "
+									 + ((obj["street"] == null) ? 	"_не указан_"	 : obj["street"]) 
+									 + ((obj["house"] == null)  ? 	""			 : (", "+obj["house"]));
 
-		var opts = {
-			reply_markup: JSON.stringify({ keyboard: settingsKeyboard, resize_keyboard: true}),
-			parse_mode: "markdown"
-		};
+			message += "\n  *Дети*: " + ((obj["kids"] == null) ? "_нет сведений_" : obj["kids"]);		
+			message += "\n  *О себе*: " + ((obj["bio"] == null) ? "_пусто_" : obj["bio"]);				
 
-		bot.sendMessage(msg.from.id, message, opts);
+			var opts = {
+				reply_markup: JSON.stringify({ keyboard: settingsKeyboard, resize_keyboard: true}),
+				parse_mode: "markdown"
+			};
+
+			bot.sendMessage(msg.from.id, message, opts);
+		});
 	});
 });
 
@@ -93,54 +105,60 @@ bot.onText(new RegExp( '^('	+ settingsCommands.changeName
 		return; //allow to change settings only in private conversation
 	}
 	
-	var state = settingsUserState.defaultState;
-	var prompt = null;
+	global.checkAuthentication(msg.from.id, function(result) {
+		if ( result == false ) {
+			return;
+		}
 	
-	switch (match[0]) {
-		case settingsCommands.changeName:
-			state = settingsUserState.changeNameState;
-			prompt = "Напишите свое имя и фамилию, чтобы ваши соседи смогли с вами познакомиться:";
-			break;
-		case settingsCommands.changePhone:
-			state = settingsUserState.changePhoneState;		
-			prompt = "Укажите свой мобильный номер, чтобы соседи смогли связаться с вами в случае чего:";
-			break;
-		case settingsCommands.changeEmail:
-			state = settingsUserState.changeEmailState;
-			prompt = "Напишите свой адрес e-mail, пожалуйста (обещаем не спамить):"			
-			break;
-		case settingsCommands.changeKidsInfo:
-			state = settingsUserState.changeKidsInfoState;
-			prompt = "Укажите имена и возраст своих детей, включая №№ школ/садов, куда они ходят:"
-			break;
-		case settingsCommands.changeAboutInfo:
-			state = settingsUserState.changeAboutInfoState;
-			prompt = "Напишите вкратце свои увлечения, интересы и род занятий (для поиска единомышленников):"
-			break;
-		default:
-			break;
-	}
-	
-	setTimeout(function () {
-		setCurrentState(msg.from.id, state);
-	}, 100);
-	
-	var opts = {
-			reply_markup: {
-				hide_keyboard: true,
-				one_time_keyboard: true
-			},
-			parse_mode: "markdown"
-		};
+		var state = settingsUserState.defaultState;
+		var prompt = null;
+		
+		switch (match[0]) {
+			case settingsCommands.changeName:
+				state = settingsUserState.changeNameState;
+				prompt = "Напишите свое имя и фамилию, чтобы ваши соседи смогли с вами познакомиться:";
+				break;
+			case settingsCommands.changePhone:
+				state = settingsUserState.changePhoneState;		
+				prompt = "Укажите свой мобильный номер, чтобы соседи смогли связаться с вами в случае чего:";
+				break;
+			case settingsCommands.changeEmail:
+				state = settingsUserState.changeEmailState;
+				prompt = "Напишите свой адрес e-mail, пожалуйста (обещаем не спамить):"			
+				break;
+			case settingsCommands.changeKidsInfo:
+				state = settingsUserState.changeKidsInfoState;
+				prompt = "Укажите имена и возраст своих детей, включая №№ школ/садов, куда они ходят:"
+				break;
+			case settingsCommands.changeAboutInfo:
+				state = settingsUserState.changeAboutInfoState;
+				prompt = "Напишите вкратце свои увлечения, интересы и род занятий (для поиска единомышленников):"
+				break;
+			default:
+				break;
+		}
+		
+		setTimeout(function () {
+			setCurrentState(msg.from.id, state);
+		}, 100);
+		
+		var opts = {
+				reply_markup: {
+					hide_keyboard: true,
+					one_time_keyboard: true
+				},
+				parse_mode: "markdown"
+			};
 
-	if ( prompt != null ) {
-		prompt += "\n_Если передумали — напишите «отмена»._";
-		bot.sendMessage(msg.from.id, prompt, opts);
-	}
+		if ( prompt != null ) {
+			prompt += "\n_Если передумали — напишите «отмена»._";
+			bot.sendMessage(msg.from.id, prompt, opts);
+		}
+	});
 });
 
 // capture all text input for generic fields
-bot.onText(/.{3,}/, function (msg, match) {
+bot.onText(/[\s\S]{3,}/, function (msg, match) {
 	if ( match[0].toLowerCase() == 'отмена' || match[0].toLowerCase() == 'назад в меню' ) { 
 		return; //it's a special case for other handler
 	}	
@@ -245,25 +263,31 @@ bot.onText(new RegExp('^'+settingsCommands.changeAddress), function (msg, match)
 		return; //allow to change settings only in private conversation
 	}
 	
-	var keyboard = [ 
-		[  streets.deadendy.button, 	streets.starry.button ],
-		[  streets.southy.button, 		streets.woody.button ],
-		[ "Отмена" ]
-	];
+	global.checkAuthentication(msg.from.id, function(result) {
+		if ( result == false ) {
+			return;
+		}
 	
-	var opts = {
-		reply_markup:  
-			JSON.stringify({
-				keyboard: keyboard, 
-				one_time_keyboard: true,
-				resize_keyboard: true
-			}),
-		parse_mode: "markdown"
-	};
+		var keyboard = [ 
+			[  streets.deadendy.button, 	streets.starry.button ],
+			[  streets.southy.button, 		streets.woody.button ],
+			[ "Отмена" ]
+		];
+		
+		var opts = {
+			reply_markup:  
+				JSON.stringify({
+					keyboard: keyboard, 
+					one_time_keyboard: true,
+					resize_keyboard: true
+				}),
+			parse_mode: "markdown"
+		};
 
-	bot.sendMessage(msg.from.id, "Выберите улицу, на которой живете:", opts);
-	
-	setCurrentState(msg.from.id, settingsUserState.changeAddressState);
+		bot.sendMessage(msg.from.id, "Выберите улицу, на которой живете:", opts);
+		
+		setCurrentState(msg.from.id, settingsUserState.changeAddressState);
+	});
 });
 
 // user chose street name
@@ -274,6 +298,10 @@ bot.onText(new RegExp( '^(' + streets.deadendy.button
 
 	if ( msg.chat.type != 'private' ) { 
 		return; //allow to change settings only in private conversation
+	}
+	
+	if ( getCurrentState(msg.from.id) != settingsUserState.changeAddressState ) {
+		return; //don't allow to skip menu and directly send street names
 	}
 	
 	var streetKey = null;
@@ -324,14 +352,9 @@ bot.onText(/^(\d{1,2})\/(\d)$/, function (msg, match) {
 					break;
 				}
 			}
-//			
-//			console.log(streetKey);
-//			console.log(streets[streetKey].houses);
-//			console.log(parseInt(match[i]));
 			
 			if ( streetKey != null ) {
 				var houseIndex = streets[streetKey].houses.indexOf(parseInt(match[1]));
-				
 				
 				if ( houseIndex == -1 || parseInt(match[2]) > 8 ) {
 					var streetName = streets[streetKey].name;
