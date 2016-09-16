@@ -10,12 +10,13 @@ global.bot = new TelegramBot(token, {polling: true});
 global.commands = {
 	contacts: "📞 Контакты",
 	links: 	"📋 Полезности"	,
-	rides: "🚗 Попутчики β",
+	search: "👪 Соседи",
 	gazvoda: "🔥🚿 Счетчики β",
 	settings: "🔧 Настройки"
 }
-
+//
 require("./settings.js");
+require("./search.js");
 
 // start {
 bot.onText(/\/start/, function (msg, match) {	
@@ -37,9 +38,9 @@ bot.onText(new RegExp('^('+commands.contacts+'|\/contacts)'), function (msg, mat
 
 function sendMessageWithDefaultMenu(msg, toID, opts) { 	
 	var defaultKeyboard = [ 
-		[  commands["contacts"],  commands["links"]	   ], 
-		[  commands["rides"],     commands["gazvoda"]  ], 
-		[  commands["settings"]  ]
+		[  commands.contacts,   commands.links	  ], 
+		[  commands.search,     commands.gazvoda  ], 
+		[  commands.settings  ]
 	];
 	
 	var newOpts = opts;
@@ -63,6 +64,41 @@ bot.onText(new RegExp('^(отмена|\/cancel|назад в меню)', 'i'), f
 	if ( msg.chat.type == 'private' ){
 		sendMessageWithDefaultMenu("Хорошо, чем могу быть еще полезен?", msg.from.id);			
 	}
-	
-	//console.log("main cancel");
 });
+
+bot.onText(global.password, function (msg, match) {	
+	var redisUserKey = "users:"+msg.from.id;
+	
+	redis.hget(redisUserKey, "auth", function (err, obj) {
+		var opts = {parse_mode: 'markdown'};
+		
+		if ( obj == null ) {
+			redis.hset(redisUserKey, "auth", "1");
+						
+			var message = "*Спасибо*!\n_Вы теперь можете полноценно пользоваться ботом и всеми его функциями._"
+			sendMessageWithDefaultMenu(message, msg.from.id, opts);			
+		} else {
+			bot.sendMessage(msg.chat.id, "_Вы уже были авторизованы ранее._", opts);			
+		}
+		
+
+	});
+});
+
+global.checkAuthentication = function (userID, callback) {
+	var redisUserKey = "users:"+userID;
+
+	redis.hgetall(redisUserKey, function (err, obj) {
+		if ( obj != null && obj["auth"] != null ) {
+			callback(true);
+		} else if ( obj != null && obj["house"] != null ) {
+			redis.hset(redisUserKey, "auth", "1");
+			callback(true);
+		} else {
+			message = "Данная функция доступна только авторизованным пользователям.\n_Узнайте пароль у соседей и напишите его сюда_.";
+			bot.sendMessage(userID, message, {parse_mode: "markdown"});
+			
+			callback(false);
+		}
+	});
+};
