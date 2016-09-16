@@ -67,6 +67,10 @@ bot.onText(new RegExp('^(отмена|\/cancel|назад в меню)', 'i'), f
 });
 
 bot.onText(global.password, function (msg, match) {	
+	if ( msg.chat.type != 'private' ) { 
+		return; //allow auth only in private conversation
+	}
+	
 	var redisUserKey = "users:"+msg.from.id;
 	
 	redis.hget(redisUserKey, "auth", function (err, obj) {
