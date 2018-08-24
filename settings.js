@@ -1,5 +1,7 @@
 // settings
 
+var mdEscape = require('markdown-escape');
+
 var settingsCommands = {
 	changeName: "📝 Имя",
 	changePhone: "☎️ Тел №",	
@@ -59,10 +61,14 @@ bot.onText(new RegExp('^('+commands.settings+'|\/settings)'), function (msg, mat
 				var name = first != undefined ? first : "";
 				name += last != undefined ? (" "+last) : "";
 				
-				if ( name.length <= 3 ) {
+				if ( name == undefined || name.length <= 3 ) {
 					name = msg.from.username;
 				}
 				
+				if ( name == undefined || name.length <= 1 ) {
+					name = "Без имени";
+				}
+
 				obj = { "name": name }	
 				redis.hset(redisUserKey, "name", name);
 			}
@@ -73,15 +79,19 @@ bot.onText(new RegExp('^('+commands.settings+'|\/settings)'), function (msg, mat
 				redis.hset(redisUserKey, "username", msg.from.username);
 			}
 			
+			console.log(obj);
+
 			message += "\n  *Имя*: " + obj["name"];
 			message += "\n  *Телефон*: " + ((obj["tel"] == null) ? "_не указан_" : obj["tel"]);
-			message += "\n  *E-mail*: " + ((obj["email"] == null) ? "_не указан_" : obj["email"]);		
+			message += "\n  *E-mail*: " + ((obj["email"] == null) ? "_не указан_" : mdEscape(obj["email"]));		
 			message += "\n  *Адрес*: "
 									 + ((obj["street"] == null) ? 	"_не указан_"	 : obj["street"]) 
 									 + ((obj["house"] == null)  ? 	""			 : (", "+obj["house"]));
 
-			message += "\n  *Дети*: " + ((obj["kids"] == null) ? "_нет сведений_" : obj["kids"]);		
-			message += "\n  *О себе*: " + ((obj["bio"] == null) ? "_пусто_" : obj["bio"]);				
+			message += "\n  *Дети*: " + ((obj["kids"] == null) ? "_нет сведений_" : safe_tags_replace(mdEscape(obj["kids"])));		
+			message += "\n  *О себе*: " + ((obj["bio"] == null) ? "_пусто_" : safe_tags_replace(mdEscape(obj["bio"])));				
+
+			console.log(message);
 
 			var opts = {
 				reply_markup: JSON.stringify({ keyboard: settingsKeyboard, resize_keyboard: true}),
@@ -400,3 +410,19 @@ function getCurrentState(id) {
 	return currentState[id];
 }
 
+var tagsToReplace = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;'
+};
+
+function replaceTag(tag) {
+    return tagsToReplace[tag] || tag;
+}
+
+function safe_tags_replace(str) {
+    var res = str.replace(/[&<>]/g, replaceTag);
+    res = res.replace("\\/", "/");
+    res = res.replace("_", "\\_");
+    return res;
+}
