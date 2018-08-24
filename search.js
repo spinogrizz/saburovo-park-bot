@@ -103,7 +103,7 @@ bot.onText(new RegExp(addressRegexp, 'i'), function (msg, match) {
 			break;		
 		case "звёзд":
 		case "звезд":		
-			street = "Звёздная";		
+			street = "Звездная";		
 			break;
 	}
 	
@@ -359,6 +359,23 @@ function createInlineButtons(position, length, resultID) {
 	}	
 }
 
+var tagsToReplace = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;'
+};
+
+function replaceTag(tag) {
+    return tagsToReplace[tag] || tag;
+}
+
+function safe_tags_replace(str) {
+    var res = str.replace(/[&<>]/g, replaceTag);
+    res = res.replace("\\/", "/");
+    res = res.replace("_", "\\_");
+    return res;
+}
+
 function createUserDescription(user, forUserID) {
 	var desc = "*" + user["name"] + "*";
 		
@@ -370,9 +387,9 @@ function createUserDescription(user, forUserID) {
 		if ( user["tel"] != null ) { desc += "\n☎️ " + user["tel"]; }
 	}
 	
-	if ( user["email"] != null ) { desc += "\n✉️ " + user["email"]; }
-	if ( user["kids"] != null ) { desc += "\n👶 " + mdEscape(user["kids"]); }
-	if ( user["bio"] != null ) { desc += "\n📖 " + mdEscape(user["bio"]); }	
+	if ( user["email"] != null ) { desc += "\n✉️ " + safe_tags_replace(user["email"]); }
+	if ( user["kids"] != null ) { desc += "\n👶 " + safe_tags_replace(mdEscape(user["kids"])); }
+	if ( user["bio"] != null ) { desc += "\n📖 " + safe_tags_replace(mdEscape(user["bio"])); }	
 	
 	return desc;
 }
