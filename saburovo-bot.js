@@ -5,7 +5,14 @@ var node_redis = require('redis');
 global.redis = node_redis.createClient();
 
 var TelegramBot = require('node-telegram-bot-api');
-global.bot = new TelegramBot(token, {polling: true});
+global.bot = new TelegramBot(token, {
+					polling: true,
+					request: {
+					   proxy: "http://localhost:8118",
+					}
+				});
+
+console.log(global.bot);
 
 global.commands = {
 	contacts: "📞 Контакты",
@@ -17,6 +24,7 @@ global.commands = {
 //
 require("./settings.js");
 require("./search.js");
+require("./avelaping.js");
 
 // start {
 bot.onText(/\/start/, function (msg, match) {	
