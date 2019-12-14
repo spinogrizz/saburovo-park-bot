@@ -8,22 +8,23 @@ var TelegramBot = require('node-telegram-bot-api');
 global.bot = new TelegramBot(token, {
 					polling: true,
 					request: {
-					   proxy: "http://localhost:8118",
+//					   proxy: "http://localhost:8118",
 					}
 				});
 
-console.log(global.bot);
+//console.log(global.bot);
 
 global.commands = {
 	contacts: "📞 Контакты",
 	links: 	"📋 Полезности"	,
 	search: "👪 Соседи",
-	gazvoda: "🔥🚿 Счетчики β",
+	groups: "💬 Группы",
 	settings: "🔧 Настройки"
 }
 //
 require("./settings.js");
 require("./search.js");
+require("./chatrooms.js");
 require("./avelaping.js");
 
 // start {
@@ -47,7 +48,7 @@ bot.onText(new RegExp('^('+commands.contacts+'|\/contacts)'), function (msg, mat
 function sendMessageWithDefaultMenu(msg, toID, opts) { 	
 	var defaultKeyboard = [ 
 		[  commands.contacts,   commands.links	  ], 
-		[  commands.search,     commands.gazvoda  ], 
+		[  commands.search,     commands.groups  ], 
 		[  commands.settings  ]
 	];
 	
