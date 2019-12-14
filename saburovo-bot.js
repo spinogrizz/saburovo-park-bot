@@ -8,7 +8,7 @@ var TelegramBot = require('node-telegram-bot-api');
 global.bot = new TelegramBot(token, {
 					polling: true,
 					request: {
-//					   proxy: "http://localhost:8118",
+						proxy: "http://localhost:8118",
 					}
 				});
 
@@ -35,6 +35,20 @@ bot.onText(/\/start/, function (msg, match) {
 // contacts
 bot.onText(new RegExp('^('+commands.contacts+'|\/contacts)'), function (msg, match) {
 	fs.readFile('./contacts.md', function (err, data) {
+		var opts = {parse_mode: 'markdown'};
+	
+		if ( msg.chat.type == 'group' ) { 
+			bot.sendMessage(msg.chat.id, data, opts);
+		} else if ( msg.chat.type == 'private' ){
+			sendMessageWithDefaultMenu(data, msg.from.id, opts);			
+		}
+	});
+});
+
+// links
+// contacts
+bot.onText(new RegExp('^('+commands.links+'|\/links)'), function (msg, match) {
+	fs.readFile('./links.md', function (err, data) {
 		var opts = {parse_mode: 'markdown'};
 	
 		if ( msg.chat.type == 'group' ) { 
