@@ -8,17 +8,17 @@ var TelegramBot = require('node-telegram-bot-api');
 global.bot = new TelegramBot(token, {
 					polling: true,
 					request: {
-						proxy: "http://localhost:8118",
+						//proxy: "http://localhost:8118",
 					}
 				});
 
 //console.log(global.bot);
 
 global.commands = {
-	contacts: "📞 Контакты",
-	links: 	"📋 Личный кабинет"	,
+	contacts: "📞 Информация",
 	search: "👪 Соседи",
 	groups: "💬 Группы",
+	trashcam: "📹 Помойка",	
 	settings: "🔧 Настройки"
 }
 //
@@ -26,6 +26,7 @@ require("./settings.js");
 require("./search.js");
 require("./chatrooms.js");
 require("./avelaping.js");
+require("./camera.js");
 
 // start {
 bot.onText(/\/start/, function (msg, match) {	
@@ -37,7 +38,10 @@ bot.onText(/\/start/, function (msg, match) {
 // contacts
 bot.onText(new RegExp('^('+commands.contacts+'|\/contacts)'), function (msg, match) {
 	fs.readFile('./contacts.md', function (err, data) {
-		var opts = {parse_mode: 'markdown'};
+		var opts = {
+			parse_mode: 'markdown',
+			disable_web_page_preview: true,
+		};
 	
 		if ( msg.chat.type == 'group' ) { 
 			bot.sendMessage(msg.chat.id, data, opts);
@@ -47,24 +51,11 @@ bot.onText(new RegExp('^('+commands.contacts+'|\/contacts)'), function (msg, mat
 	});
 });
 
-// links
-// contacts
-bot.onText(new RegExp('^('+commands.links+'|\/links)'), function (msg, match) {
-	fs.readFile('./links.md', function (err, data) {
-		var opts = {parse_mode: 'markdown'};
-	
-		if ( msg.chat.type == 'group' ) { 
-			bot.sendMessage(msg.chat.id, data, opts);
-		} else if ( msg.chat.type == 'private' ){
-			sendMessageWithDefaultMenu(data, msg.from.id, opts);			
-		}
-	});
-});
 
 function sendMessageWithDefaultMenu(msg, toID, opts) { 	
 	var defaultKeyboard = [ 
-		[  commands.contacts,   commands.links	  ], 
-		[  commands.search,     commands.groups  ], 
+		[  commands.contacts,   commands.search	  ], 
+		[  commands.trashcam,   commands.groups   ], 
 		[  commands.settings  ]
 	];
 	
@@ -85,9 +76,9 @@ function sendMessageWithDefaultMenu(msg, toID, opts) {
 	bot.sendMessage(toID, msg, newOpts);
 }
 
-bot.onText(new RegExp('^(отмена|\/cancel|назад в меню)', 'i'), function (msg, match) {
+bot.onText(new RegExp('^(привет|отмена|\/cancel|назад в меню)', 'i'), function (msg, match) {
 	if ( msg.chat.type == 'private' ){
-		sendMessageWithDefaultMenu("Хорошо, чем могу быть еще полезен?", msg.from.id);			
+		sendMessageWithDefaultMenu("Чем могу быть полезен?", msg.from.id);			
 	}
 });
 
