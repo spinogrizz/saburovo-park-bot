@@ -1,0 +1,9 @@
+{
+  "dependencies": {
+    "markdown-escape": "^1.1.0",
+    "node-telegram-bot-api": "^0.51.0",
+    "ping": "^0.4.0",
+    "redis": "^3.0.2",
+    "tmp": "^0.2.1"
+  }
+}
