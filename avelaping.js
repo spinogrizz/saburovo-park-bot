@@ -2,14 +2,13 @@ var ping = require('ping');
 const fs = require('fs'); 
 
 var hosts = [
-	'193.242.177.230', //Д
+	'saburovo.online', //Д
 	'193.242.177.240', //Т
 	'193.242.177.246', //Н
 	'193.242.177.227', //Г
+	'bacchussh.hldns.ru', //А	
+	'193.242.176.120', //АБ
 ];
-
-var lastStateUpdate = undefined;
-var currentState = undefined;
 
 var internetState = {
 	stateUnknown : 0,
@@ -17,6 +16,14 @@ var internetState = {
 	stateSomeInternetAvailable : 2,	
 	stateInternetWorks : 3,	
 }
+
+var lastStateUpdate = undefined;
+var currentState = internetState.stateUnknown;
+
+var usersToNotify = [ //241065, //author
+					  -1001070050013, //main chat
+					  584270717, //avelacom support
+					];
 
 function pingpong() {
 	var processed = 0;
@@ -26,6 +33,8 @@ function pingpong() {
 		
 		ping.sys.probe(host, function(isAlive) {
 			
+			console.log('host '+host+' is alive: '+isAlive);
+
 			if ( isAlive ) {
 				alive++;
 			}
@@ -39,6 +48,8 @@ function pingpong() {
 				
 				fs.appendFile('uptime.log', data);
 
+				var lastState = currentState;
+
 				if ( percentage >= 60 ) {
 					currentState = internetState.stateInternetWorks;
 				} else if ( percentage >= 20 ) {
@@ -48,50 +59,74 @@ function pingpong() {
 				}
 
 				lastStateUpdate = date.getTime();
+
+				if ( lastState != currentState ) {
+					notify_internet(lastState, currentState);
+				}
 			}
-		});
+		}, { 'timeout': 5 } );
 	});	
 }
 
-bot.onText(new RegExp('^(авелаком|интернет)$'), function (msg, match) {	
+function intenetStateToText(state) {
+	var now = new Date();
+
+	if (   lastStateUpdate == undefined 
+		|| state == internetState.stateUnknown
+		|| now.getTime() - lastStateUpdate > 5*60*1000 ) 
+	{
+		state = internetState.stateUnknown;		
+		return "_Состояние провайдера неизвестно, попробуйте позже_";
+	} else {	
+		switch (state) {
+			case internetState.stateNoInternet:
+				return "🔴 Провайдер Avelacom *не доступен* в поселке";
+				break;
+
+			case internetState.stateSomeInternetAvailable:
+				return "⚪ Подключение к Avelacom *доступно не во всех домах*";
+				break;
+
+			case internetState.stateInternetWorks:			
+				return "🔵 Подключение к Avelacom *работает в штатном режиме*";
+				break;
+		}
+	}
+}
+
+bot.onText(new RegExp('^(\/avelaping|авелаком|интернет)$', 'i'), function (msg, match) {	
 	if ( msg.chat.type != 'private' ) { 
 		return; //allow request only in private conversation
 	}
 
-	var now = new Date();
-	var reply = undefined;
 
-	if (   lastStateUpdate == undefined 
-		|| currentState == internetState.stateUnknown
-		|| now.getTime() - lastStateUpdate > 5*60*1000 ) 
-	{
-		reply = "_Состояние провайдера неизвестно, попробуйте позже_";
-		currentState = internetState.stateUnknown;
-	} else {
-
-		switch (currentState) {
-			case internetState.stateNoInternet:
-				reply = "🔴 Провайдер Avelacom *не доступен* в поселке";
-				break;
-
-			case internetState.stateSomeInternetAvailable:
-				reply = "⚪ Подключение к Avelacom *доступно не во всех домах*";
-				break;
-
-			case internetState.stateInternetWorks:			
-				reply = "🔵 Подключение к Avelacom *работает в штатном режиме*";
-				break;
-		}
-	}
+	var reply = intenetStateToText(currentState);
 
 	if ( reply != undefined ) {
-		var opts = {
-			parse_mode: "markdown"
-		};
-
-		bot.sendMessage(msg.chat.id, reply, opts);
+		bot.sendMessage(msg.chat.id, reply, {parse_mode: "markdown"});
 	}
 });
+
+
+function notify_internet(ls, cs) {
+	if (    ls == internetState.stateUnknown 
+	 	 || cs == internetState.stateUnknown ) {
+		return;
+	}
+
+	if ( cs == internetState.stateInternetWorks || cs == internetState.stateNoInternet ) {
+		var reply = intenetStateToText(currentState);
+
+		if ( reply != undefined ) {
+
+			for ( var i in usersToNotify ) {
+				var user_id = usersToNotify[i];
+				bot.sendMessage(user_id, reply, {parse_mode: "markdown"});
+			}
+			
+		}
+	}
+}	
 
 setInterval(pingpong, 30000);
 pingpong();
