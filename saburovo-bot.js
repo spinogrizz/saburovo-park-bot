@@ -16,7 +16,7 @@ global.bot = new TelegramBot(token, {
 
 global.commands = {
 	contacts: "📞 Контакты",
-	links: 	"📋 Полезности"	,
+	links: 	"📋 Личный кабинет"	,
 	search: "👪 Соседи",
 	groups: "💬 Группы",
 	settings: "🔧 Настройки"
@@ -31,6 +31,8 @@ require("./avelaping.js");
 bot.onText(/\/start/, function (msg, match) {	
 	sendMessageWithDefaultMenu("Вот с чем я могу помочь:", msg.from.id);			
 });
+
+//bot.sendMessage(-1001070050013, "Готов подписывать любые документы. Зарплату просить не буду");
 
 // contacts
 bot.onText(new RegExp('^('+commands.contacts+'|\/contacts)'), function (msg, match) {
