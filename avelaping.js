@@ -22,7 +22,7 @@ var currentState = internetState.stateUnknown;
 
 var usersToNotify = [ //241065, //author
 					  -1001070050013, //main chat
-					  584270717, //avelacom support
+					  1237321936, //avelacom support
 					];
 
 function pingpong() {
