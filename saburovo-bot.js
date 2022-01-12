@@ -27,11 +27,16 @@ require("./search.js");
 require("./chatrooms.js");
 require("./avelaping.js");
 require("./camera.js");
+require("./reminder.js");
 
 // start {
 bot.onText(/\/start/, function (msg, match) {	
 	sendMessageWithDefaultMenu("Вот с чем я могу помочь:", msg.from.id);			
 });
+
+//bot.onText(/\/id/, function(msg, match) {
+//	bot.sendMessage(msg.chat.id, msg.chat.id, {})
+//});
 
 //bot.sendMessage(-1001070050013, "Готов подписывать любые документы. Зарплату просить не буду");
 
