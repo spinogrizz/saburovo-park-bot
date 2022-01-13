@@ -1,4 +1,4 @@
-const chatID = -758958086
+const chatID = -1001070050013 // main chat
 const regularMessage = "🔥💧 Не забудьте подать показания счетчиков в [расчетный центр](https://saburovopark.ru/lk) до конца месяца"
 const lastDayMessage = "🔥💧 Сегодня последний день подачи показания счетчиков в [расчетный центр](https://saburovopark.ru/lk)"
 
@@ -7,15 +7,14 @@ function remind_counters() {
 	
 	var messageToSend = undefined
 	
-	if (   today.getDate() == 20
-		&& today.getHours() == 20
+	if (   today.getHours() == 20
 		&& today.getMinutes() == 0 )
 	{
 		var lastDayOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0)
 	
 		if ( today.getDate() == lastDayOfMonth.getDate() ) {
 			messageToSend = lastDayMessage
-		} else {
+		} else if ( today.getDate() == 20 ) {
 			messageToSend = regularMessage
 		}
 	}
@@ -35,5 +34,4 @@ function remind_counters() {
 	}
 }
 
-remind_counters()
 setInterval(remind_counters, 45*1000)
