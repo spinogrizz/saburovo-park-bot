@@ -2,7 +2,7 @@ var ping = require('ping');
 const fs = require('fs'); 
 
 var hosts = [
-	'saburovo.online', //Д
+	'193.242.177.230', //Д
 	'193.242.177.240', //Т
 	'193.242.177.246', //Н
 	'193.242.177.227', //Г
