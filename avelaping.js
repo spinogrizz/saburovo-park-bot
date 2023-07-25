@@ -6,7 +6,7 @@ var hosts = [
 	'193.242.177.240', //Т
 	'193.242.177.246', //Н
 	'193.242.177.227', //Г
-	'bacchussh.hldns.ru', //А	
+	//'bacchussh.hldns.ru', //А	
 	'193.242.176.120', //АБ
 ];
 
@@ -33,20 +33,24 @@ function pingpong() {
 		
 		ping.sys.probe(host, function(isAlive) {
 			
-			console.log('host '+host+' is alive: '+isAlive);
+			if ( isAlive == null || isAlive == undefined ) {
+				isAlive = false
+			}
 
 			if ( isAlive ) {
 				alive++;
 			}
 									
-			if ( ++processed == hosts.length ) {
+			if ( ++processed >= hosts.length ) {
 				var date = new Date();
 				var timestamp = date.getTime();
 				var percentage = Math.round((alive/processed)*100);
 
 				var data = timestamp + ',' + percentage + '\n';
 				
-				fs.appendFile('uptime.log', data);
+				fs.appendFile('uptime.log', data, (err) => {
+					if ( err ) { console.log(err); }
+				});
 
 				var lastState = currentState;
 
