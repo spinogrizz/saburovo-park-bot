@@ -1,6 +1,6 @@
 const chatID = -1001070050013 // main chat
-const regularMessage = "🔥💧 Не забудьте подать показания счетчиков в [расчетный центр](https://lk.saburovopark.net/) до конца месяца"
-const lastDayMessage = "🔥💧 Сегодня последний день подачи показания счетчиков в [расчетный центр](https://lk.saburovopark.net/)"
+const regularMessage = "🔥💧 Не забудьте подать показания счетчиков в [расчетный центр](https://saburovopark.ru/lk) до конца месяца"
+const lastDayMessage = "🔥💧 Сегодня последний день подачи показания счетчиков в [расчетный центр](https://saburovopark.ru/lk)"
 
 function remind_counters() {
 	var today = new Date(new Date().toLocaleString("en-US", {timeZone: "Europe/Moscow"}))
@@ -34,4 +34,4 @@ function remind_counters() {
 	}
 }
 
-setInterval(remind_counters, 45*1000)
+setInterval(remind_counters, 58*1000)
