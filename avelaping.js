@@ -54,7 +54,7 @@ function pingpong() {
 
 				var lastState = currentState;
 
-				if ( percentage >= 60 ) {
+				if ( percentage >= 40 ) {
 					currentState = internetState.stateInternetWorks;
 				} else if ( percentage >= 20 ) {
 					currentState = internetState.stateSomeInternetAvailable;
