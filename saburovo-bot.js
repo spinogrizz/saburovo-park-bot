@@ -19,6 +19,7 @@ global.commands = {
 	search: "👪 Соседи",
 	groups: "💬 Группы",
 	trashcam: "📹 Помойка",	
+	avelacom: "📡 Авелаком",
 	settings: "🔧 Настройки"
 }
 //
@@ -61,7 +62,7 @@ function sendMessageWithDefaultMenu(msg, toID, opts) {
 	var defaultKeyboard = [ 
 		[  commands.contacts,   commands.search	  ], 
 		[  commands.trashcam,   commands.groups   ], 
-		[  commands.settings  ]
+		[  commands.avelacom,   commands.settings ]
 	];
 	
 	var newOpts = opts;

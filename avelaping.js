@@ -98,7 +98,7 @@ function intenetStateToText(state) {
 	}
 }
 
-bot.onText(new RegExp('^(\/avelaping|авелаком|интернет)$', 'i'), function (msg, match) {	
+bot.onText(new RegExp('^(\/avelaping|авелаком|интернет|'+global.commands.avelacom+')$', 'i'), function (msg, match) {	
 	if ( msg.chat.type != 'private' ) { 
 		return; //allow request only in private conversation
 	}
