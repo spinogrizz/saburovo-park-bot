@@ -2,7 +2,7 @@ const fs = require("fs");
 require("./token.js")(); //import API token
 
 var node_redis = require('redis');
-global.redis = node_redis.createClient();
+global.redis = node_redis.createClient({host: process.env.REDIS_HOST || 'localhost'});
 
 var TelegramBot = require('node-telegram-bot-api');
 global.bot = new TelegramBot(token, {
