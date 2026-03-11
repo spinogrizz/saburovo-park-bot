@@ -5,9 +5,8 @@ var hosts = [
 	'193.242.177.230', //Д
 	'193.242.177.240', //Т
 	'193.242.177.246', //Н
-	'193.242.177.227', //Г
-	//'bacchussh.hldns.ru', //А	
-	'193.242.176.120', //АБ
+//	'193.242.176.120', //АБ
+	'193.242.177.82', //ДХ
 ];
 
 var internetState = {
@@ -36,6 +35,8 @@ function pingpong() {
 			if ( isAlive == null || isAlive == undefined ) {
 				isAlive = false
 			}
+
+			console.log(host, isAlive);
 
 			if ( isAlive ) {
 				alive++;
@@ -68,7 +69,7 @@ function pingpong() {
 					notify_internet(lastState, currentState);
 				}
 			}
-		}, { 'timeout': 5 } );
+		}, { 'timeout': 10 } );
 	});	
 }
 
@@ -124,8 +125,8 @@ function notify_internet(ls, cs) {
 		if ( reply != undefined ) {
 
 			for ( var i in usersToNotify ) {
-				var user_id = usersToNotify[i];
-				bot.sendMessage(user_id, reply, {parse_mode: "markdown"});
+			 	var user_id = usersToNotify[i];
+			 	bot.sendMessage(user_id, reply, {parse_mode: "markdown"});
 			}
 			
 		}
