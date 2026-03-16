@@ -5,12 +5,27 @@ var node_redis = require('redis');
 global.redis = node_redis.createClient({host: process.env.REDIS_HOST || 'localhost'});
 
 var TelegramBot = require('node-telegram-bot-api');
-global.bot = new TelegramBot(token, {
-					polling: true,
-					request: {
-						//proxy: "http://localhost:8118",
-					}
-				});
+var botOpts = { polling: true };
+
+if (process.env.TELEGRAM_PROXY) {
+	const Agent = require('socks5-https-client/lib/Agent');
+	// Формат: user:password@host:port или host:port
+	const proxy = process.env.TELEGRAM_PROXY;
+	const match = proxy.match(/^(?:(.+):(.+)@)?(.+):(\d+)$/);
+	if (match) {
+		botOpts.request = {
+			agentClass: Agent,
+			agentOptions: {
+				socksHost: match[3],
+				socksPort: parseInt(match[4]),
+				socksUsername: match[1],
+				socksPassword: match[2]
+			}
+		};
+	}
+}
+
+global.bot = new TelegramBot(token, botOpts);
 
 //console.log(global.bot);
 
