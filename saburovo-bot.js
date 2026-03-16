@@ -8,21 +8,12 @@ var TelegramBot = require('node-telegram-bot-api');
 var botOpts = { polling: true };
 
 if (process.env.TELEGRAM_PROXY) {
-	const Agent = require('socks5-https-client/lib/Agent');
+	const { SocksProxyAgent } = require('socks-proxy-agent');
 	// Формат: user:password@host:port или host:port
-	const proxy = process.env.TELEGRAM_PROXY;
-	const match = proxy.match(/^(?:(.+):(.+)@)?(.+):(\d+)$/);
-	if (match) {
-		botOpts.request = {
-			agentClass: Agent,
-			agentOptions: {
-				socksHost: match[3],
-				socksPort: parseInt(match[4]),
-				socksUsername: match[1],
-				socksPassword: match[2]
-			}
-		};
-	}
+	const proxyUrl = `socks5://${process.env.TELEGRAM_PROXY}`;
+	botOpts.request = {
+		agent: new SocksProxyAgent(proxyUrl)
+	};
 }
 
 global.bot = new TelegramBot(token, botOpts);
