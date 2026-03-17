@@ -1,6 +1,6 @@
 const mdEscape = require('markdown-escape');
 const fs = require("fs");
-const request = require('request');
+const { execFile } = require('child_process');
 const tmp = require('tmp');
 
 //list of chatrooms
@@ -16,43 +16,15 @@ bot.onText(new RegExp('^('+commands.trashcam+'|\/trashcam|помойка)'), fun
 		
 		var cameraURL = global.cameras[0]; //only one camera right now
 		var temporaryFile = "/tmp/camera_0_" + msg.from.id + ".jpg";
-		var downloadFailed = false;
 				
 		console.log(temporaryFile);
 		console.log(cameraURL);
 
-		var download = request(cameraURL);
-		var output = fs.createWriteStream(temporaryFile);
-
-		download.on('response', function(response) {
-			if (response.statusCode !== 200) {
-				downloadFailed = true;
-				console.log('[camera] Unexpected status code: ' + response.statusCode);
-				download.abort();
-				output.destroy();
+		execFile('wget', ['-q', '-T', '15', '-O', temporaryFile, cameraURL], function(err) {
+			if (err) {
+				console.log('[camera] Download failed:', err);
 				fs.unlink(temporaryFile, function() {});
 				bot.sendMessage(msg.from.id, "_Не удалось получить снимок с камеры_", { parse_mode: "markdown" });
-			}
-		});
-
-		download.on('error', function(err) {
-			downloadFailed = true;
-			console.log('[camera] Download failed:', err);
-			output.destroy();
-			fs.unlink(temporaryFile, function() {});
-			bot.sendMessage(msg.from.id, "_Не удалось получить снимок с камеры_", { parse_mode: "markdown" });
-		});
-
-		output.on('error', function(err) {
-			downloadFailed = true;
-			console.log('[camera] Write failed:', err);
-			download.abort();
-			fs.unlink(temporaryFile, function() {});
-			bot.sendMessage(msg.from.id, "_Не удалось сохранить снимок с камеры_", { parse_mode: "markdown" });
-		});
-
-		output.on('finish', function() {
-			if (downloadFailed) {
 				return;
 			}
 
@@ -74,8 +46,6 @@ bot.onText(new RegExp('^('+commands.trashcam+'|\/trashcam|помойка)'), fun
 					});
 			});
 		});
-
-		download.pipe(output);
 	
 	});
 });
