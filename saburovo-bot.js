@@ -5,16 +5,11 @@ var node_redis = require('redis');
 global.redis = node_redis.createClient({host: process.env.REDIS_HOST || 'localhost'});
 
 var TelegramBot = require('node-telegram-bot-api');
-var botOpts = { polling: true };
-
-if (process.env.TELEGRAM_PROXY) {
-	const { SocksProxyAgent } = require('socks-proxy-agent');
-	// Формат: user:password@host:port или host:port
-	const proxyUrl = `socks5://${process.env.TELEGRAM_PROXY}`;
-	botOpts.request = {
-		agent: new SocksProxyAgent(proxyUrl)
-	};
-}
+// Telegram API — через свой прокси tgapi.gryzlov.com (api.telegram.org с сервера напрямую недоступен).
+var botOpts = {
+	polling: true,
+	baseApiUrl: process.env.TELEGRAM_API_BASE_URL || 'https://tgapi.gryzlov.com',
+};
 
 global.bot = new TelegramBot(token, botOpts);
 
