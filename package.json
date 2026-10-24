@@ -2,7 +2,6 @@
   "dependencies": {
     "markdown-escape": "^1.1.0",
     "node-telegram-bot-api": "^0.67.0",
-    "ping": "^0.4.0",
     "redis": "^3.0.2",
     "socks-proxy-agent": "^8.0.2",
     "tmp": "^0.2.1"

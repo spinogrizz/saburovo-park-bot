@@ -1,225 +1,122 @@
-var ping = require('ping');
-const fs = require('fs');
+// Состояние провайдера Avelacom считает бэкенд приложения Сабурово Парк (saburovo-park-backend):
+// он пингует оборудование в посёлке (адреса — в админке), ведёт журнал сбоев и решает,
+// когда есть повод написать в чат. Бот забирает эти поводы long polling'ом
+// (/internal/provider/notices) и пишет сообщения — тексты только здесь.
+// Бэкенд доступен по docker-сети shared; ключ — тот же INTERNAL_TOKEN, что у бэкенда.
 
-var hosts = [
-	'193.242.177.230', //Д
-	'193.242.177.240', //Т
-	'193.242.177.246', //Н
-	'193.242.176.130', //ДП
-];
+var BACKEND_URL = process.env.BACKEND_URL || 'http://saburovo-park-backend:3000';
+var BACKEND_TOKEN = process.env.BACKEND_TOKEN;
 
-// Популярные РФ ресурсы для проверки интернета у хостера
-var internetCheckHosts = [
-	'ya.ru',
-	'vk.com',
-	'mail.ru',
-	'ozon.ru',
-];
-
-var internetState = {
-	stateUnknown : 0,
-	stateNoInternet : 1,
-	stateSomeInternetAvailable : 2,
-	stateInternetWorks : 3,
-}
-
-var confirmedState = internetState.stateUnknown;
-var pendingState = null;
-var pendingCount = 0;
-var lastNotificationTime = {};
-
-const CONFIRMATIONS_NEEDED = 2;
-const CHECK_INTERVAL = 15000; // 15 сек между проверками
-const MIN_NOTIFICATION_INTERVAL = 5 * 60 * 1000;
+// До какого сообщения дошли — в redis, чтобы после перезапуска не повторять и не терять.
+var CURSOR_KEY = 'avelacom:notice';
+// Бот лежал дольше — старые новости в чат уже не шлём.
+var MAX_NOTICE_AGE = 15 * 60 * 1000;
+var RETRY_DELAY = 15000;
 
 var usersToNotify = [
 	-1001070050013, //main chat
 	1237321936, //avelacom support
 ];
 
-// Проверяет доступность интернета у хостера (где запущен бот).
-// Пингует несколько популярных РФ ресурсов. Если большинство недоступно —
-// значит проблема на стороне хостера, а не у Avelacom.
-// Вызывается только при обнаружении проблемы с Avelacom, чтобы отфильтровать
-// ложные срабатывания из-за проблем с каналом у хостера.
-function checkHostingInternet(callback) {
-	var processed = 0;
-	var alive = 0;
-
-	internetCheckHosts.forEach(function(host) {
-		ping.sys.probe(host, function(isAlive) {
-			if (isAlive) alive++;
-			if (++processed >= internetCheckHosts.length) {
-				var hasInternet = (alive / processed) >= 0.5;
-				console.log('[hosting] ' + alive + '/' + processed + ' reachable');
-				callback(hasInternet);
-			}
-		}, { timeout: 5 });
+function backend(path) {
+	return fetch(BACKEND_URL + '/internal/provider' + path, {
+		headers: { Authorization: 'Bearer ' + BACKEND_TOKEN },
+		signal: AbortSignal.timeout(40000),
+	}).then(function(res) {
+		if (!res.ok) throw new Error('backend ' + res.status);
+		return res.json();
 	});
 }
 
-// Проверяет доступность IP-адресов оборудования Avelacom в поселке.
-// Пингует все хосты из списка и вычисляет процент доступных.
-// Результат записывается в uptime.log для истории.
-// Возвращает состояние: stateInternetWorks (>=40%), stateSomeInternetAvailable (>=20%), stateNoInternet (<20%).
-function checkAvelacomHosts(callback) {
-	var processed = 0;
-	var alive = 0;
-	var results = {};
-
-	hosts.forEach(function(host) {
-		ping.sys.probe(host, function(isAlive) {
-			if (isAlive == null || isAlive == undefined) isAlive = false;
-			results[host] = isAlive;
-			if (isAlive) alive++;
-
-			if (++processed >= hosts.length) {
-				var summary = hosts.map(function(h) {
-					return h + (results[h] ? ' 🟢' : ' 🔴');
-				}).join('	');
-				console.log('[avelacom] ' + summary);
-
-				var timestamp = Date.now();
-				var percentage = Math.round((alive / processed) * 100);
-
-				fs.appendFile('uptime.log', timestamp + ',' + percentage + '\n', (err) => {
-					if (err) console.log(err);
-				});
-
-				var state;
-				if (percentage >= 40) {
-					state = internetState.stateInternetWorks;
-				} else if (percentage >= 20) {
-					state = internetState.stateSomeInternetAvailable;
-				} else {
-					state = internetState.stateNoInternet;
-				}
-
-				callback(state);
-			}
-		}, { timeout: 10 });
+function redisGet(key) {
+	return new Promise(function(resolve, reject) {
+		redis.get(key, function(err, value) { err ? reject(err) : resolve(value); });
 	});
 }
 
-// Основной цикл мониторинга. Вызывается каждые CHECK_INTERVAL мс.
-// Проверяет состояние Avelacom и сравнивает с подтверждённым состоянием.
-// Для смены состояния требуется CONFIRMATIONS_NEEDED подтверждений подряд —
-// это защищает от ложных срабатываний при кратковременных сбоях.
-function pingpong() {
-	checkAvelacomHosts(function(newState) {
-		// Первый запуск - просто запоминаем состояние
-		if (confirmedState === internetState.stateUnknown) {
-			confirmedState = newState;
-			console.log('[init] Initial state: ' + newState);
-			return;
-		}
-
-		// Состояние не изменилось
-		if (newState === confirmedState) {
-			pendingState = null;
-			pendingCount = 0;
-			return;
-		}
-
-		// Состояние изменилось - считаем подтверждения
-		if (newState === pendingState) {
-			pendingCount++;
-			console.log('[pending] ' + pendingCount + '/' + CONFIRMATIONS_NEEDED);
-		} else {
-			pendingState = newState;
-			pendingCount = 1;
-			console.log('[pending] New state detected: ' + newState + ' (1/' + CONFIRMATIONS_NEEDED + ')');
-		}
-
-		// Достаточно подтверждений?
-		if (pendingCount >= CONFIRMATIONS_NEEDED) {
-			confirmStateChange(newState);
-		}
+function redisSet(key, value) {
+	return new Promise(function(resolve, reject) {
+		redis.set(key, String(value), function(err) { err ? reject(err) : resolve(); });
 	});
 }
 
-// Вызывается когда состояние подтверждено (получено CONFIRMATIONS_NEEDED раз подряд).
-// Перед отправкой уведомления о проблеме проверяет интернет у хостера,
-// чтобы не слать ложные уведомления когда проблема на стороне хостера.
-function confirmStateChange(newState) {
-	if (newState === internetState.stateNoInternet) {
-		checkHostingInternet(function(hostingOk) {
-			if (hostingOk) {
-				applyStateChange(newState, true);
-			} else {
-				console.log('[hosting] No internet, suppressing notification');
-				applyStateChange(newState, false);
-			}
-		});
-	} else {
-		applyStateChange(newState, true);
-	}
+// «25 мин», «2 ч 5 мин», «3 дн 4 ч».
+function duration(ms) {
+	var minutes = Math.max(1, Math.round(ms / 60000));
+	var d = Math.floor(minutes / 1440);
+	var h = Math.floor((minutes % 1440) / 60);
+	var m = minutes % 60;
+	if (d) return [d + ' дн', h && h + ' ч'].filter(Boolean).join(' ');
+	return [h && h + ' ч', m && m + ' мин'].filter(Boolean).join(' ');
 }
 
-// Применяет смену состояния: обновляет confirmedState, сбрасывает pending-счётчики.
-// shouldNotify=false когда у хостера нет интернета — состояние меняем,
-// но уведомление не шлём (чтобы избежать бесконечного цикла верификации).
-function applyStateChange(newState, shouldNotify) {
-	var oldState = confirmedState;
-	confirmedState = newState;
-	pendingState = null;
-	pendingCount = 0;
-
-	console.log('[state] ' + oldState + ' -> ' + newState + (shouldNotify ? '' : ' (suppressed)'));
-
-	if (shouldNotify) {
-		notify(oldState, newState);
+// Сообщение в чат: «не работает» или «снова работает» (since — когда начался закончившийся сбой).
+function noticeText(notice) {
+	if (notice.state === 'down') {
+		return "🔴 Провайдер Avelacom *не доступен* в поселке";
 	}
+	var text = "🔵 Подключение к Avelacom *работает в штатном режиме*";
+	if (notice.since) {
+		text += "\n_Перерыв длился " + duration(new Date(notice.at) - new Date(notice.since)) + "_";
+	}
+	return text;
 }
 
-// Отправляет уведомление в чат и саппорту Avelacom.
-// Уведомляет только о крайних состояниях (работает / не работает), не о промежуточных.
-// Cooldown для каждого типа уведомления отдельный — чтобы уведомление о восстановлении
-// не блокировалось недавним уведомлением о проблеме.
-function notify(oldState, newState) {
-	if (oldState === internetState.stateUnknown || newState === internetState.stateUnknown) {
-		return;
-	}
-
-	// Cooldown для каждого типа уведомления отдельно
-	var now = Date.now();
-	if (now - (lastNotificationTime[newState] || 0) < MIN_NOTIFICATION_INTERVAL) {
-		console.log('[notify] Cooldown active for state ' + newState);
-		return;
-	}
-
-	if (newState === internetState.stateInternetWorks || newState === internetState.stateNoInternet) {
-		var text = stateToText(newState);
-		if (text) {
-			lastNotificationTime[newState] = now;
-			usersToNotify.forEach(function(userId) {
-				bot.sendMessage(userId, text, {parse_mode: "markdown"});
-			});
-		}
-	}
-}
-
-// Преобразует числовое состояние в текст для отправки пользователю.
-function stateToText(state) {
-	switch (state) {
-		case internetState.stateNoInternet:
-			return "🔴 Провайдер Avelacom *не доступен* в поселке";
-		case internetState.stateSomeInternetAvailable:
-			return "⚪ Подключение к Avelacom *доступно не во всех домах*";
-		case internetState.stateInternetWorks:
+// Ответ на «📡 Авелаком»: текущее состояние.
+function statusText(status) {
+	switch (status.state) {
+		case 'up':
 			return "🔵 Подключение к Avelacom *работает в штатном режиме*";
+		case 'partial':
+			return "⚪ Подключение к Avelacom *доступно не во всех домах*";
+		case 'down':
+			var text = "🔴 Провайдер Avelacom *не доступен* в поселке";
+			if (status.since) text += "\n_Не работает уже " + duration(Date.now() - new Date(status.since)) + "_";
+			return text;
 		default:
-			return null;
+			return "_Состояние провайдера неизвестно, попробуйте позже_";
 	}
 }
 
-// Возвращает текст статуса для ответа на запрос пользователя.
-// Если состояние ещё не определено — возвращает сообщение "попробуйте позже".
-function getStatusText() {
-	if (confirmedState === internetState.stateUnknown) {
-		return "_Состояние провайдера неизвестно, попробуйте позже_";
+function sleep(ms) {
+	return new Promise(function(resolve) { setTimeout(resolve, ms); });
+}
+
+// Бесконечный цикл: ждём новых поводов (бэкенд держит запрос до 25 с) и рассылаем их.
+async function watchNotices() {
+	var cursor = null;
+	while (true) {
+		try {
+			if (cursor === null) {
+				// Последний id у бэкенда: с него начинаем, если своего курсора нет
+				// или он «из будущего» (база бэкенда моложе курсора).
+				var head = await backend('/notices');
+				var saved = Number(await redisGet(CURSOR_KEY));
+				cursor = saved && saved <= head.last ? saved : head.last;
+				await redisSet(CURSOR_KEY, cursor);
+				console.log('[avelacom] notices from #' + cursor);
+			}
+			var result = await backend('/notices?after=' + cursor + '&wait=25');
+			result.notices.forEach(function(notice) {
+				if (Date.now() - new Date(notice.at) > MAX_NOTICE_AGE) {
+					console.log('[avelacom] skip stale notice #' + notice.id);
+					return;
+				}
+				console.log('[avelacom] notice #' + notice.id + ': ' + notice.state);
+				var text = noticeText(notice);
+				usersToNotify.forEach(function(userId) {
+					bot.sendMessage(userId, text, {parse_mode: "markdown"});
+				});
+			});
+			if (result.last !== cursor) {
+				cursor = result.last;
+				await redisSet(CURSOR_KEY, cursor);
+			}
+		} catch (err) {
+			console.log('[avelacom] ' + err.message);
+			await sleep(RETRY_DELAY);
+		}
 	}
-	return stateToText(confirmedState);
 }
 
 // Обработчик команды /avelaping и её алиасов.
@@ -227,11 +124,16 @@ function getStatusText() {
 bot.onText(new RegExp('^(\/avelaping|авелаком|интернет|'+global.commands.avelacom+')$', 'i'), function (msg, match) {
 	if (msg.chat.type != 'private') return;
 
-	var reply = getStatusText();
-	if (reply) {
+	backend('').then(statusText, function(err) {
+		console.log('[avelacom] ' + err.message);
+		return "_Не удалось узнать состояние провайдера, попробуйте позже_";
+	}).then(function(reply) {
 		bot.sendMessage(msg.chat.id, reply, {parse_mode: "markdown"});
-	}
+	});
 });
 
-setInterval(pingpong, CHECK_INTERVAL);
-pingpong();
+if (BACKEND_TOKEN) {
+	watchNotices();
+} else {
+	console.log('[avelacom] BACKEND_TOKEN не задан — оповещения о провайдере выключены');
+}
